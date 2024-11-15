@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
+import glow from '/glow.png';
+import earth from '/earth.jpg';
+import light from '/light.png';
+
+
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
 camera.position.z = 5;
@@ -19,7 +24,7 @@ controls.enableZoom = false;
 const loader = new THREE.TextureLoader();
 const geometry = new THREE.IcosahedronGeometry(1, 12);
 const material = new THREE.MeshPhongMaterial({
-  map: loader.load("/earth.jpg"),
+  map: loader.load(earth),
   depthWrite: true,
 });
 const earthMesh = new THREE.Mesh(geometry, material);
@@ -31,7 +36,7 @@ scene.add(ambientLight);
 
 // add glow to the earth
 const glowMaterial = new THREE.SpriteMaterial({
-  map: loader.load('/glow.png'),
+  map: loader.load(glow),
   color: 0x4390d1,
   transparent: true,
   opacity: 0.7,
@@ -71,7 +76,7 @@ export const createLightPillar = (options) => {
   geometry.translate(0, 0, height / 2);  // relocate to the surface of the sphere
 
   const material = new THREE.MeshBasicMaterial({
-    map: loader.load("/light.png"),
+    map: loader.load(light),
     color: options.color,  // color of the light pillar
     transparent: true,
     side: THREE.DoubleSide, 
