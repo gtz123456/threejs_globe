@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
+import { Line2 } from 'three/examples/jsm/lines/Line2.js';
+import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
+
 import glow from '/glow.png';
 import earth from '/earth.jpg';
 import light from '/light.png';
@@ -10,7 +14,9 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
 camera.position.z = 5;
 
-const renderer = new THREE.WebGLRenderer();
+const renderer = new THREE.WebGLRenderer({
+  antialias: true, // 启用抗锯齿
+});
 renderer.setSize( window.innerWidth, window.innerHeight );
 renderer.setAnimationLoop( animate );
 document.body.appendChild( renderer.domElement );
@@ -28,7 +34,7 @@ const material = new THREE.MeshPhongMaterial({
   depthWrite: true,
 });
 const earthMesh = new THREE.Mesh(geometry, material);
-earthGroup.add(earthMesh);
+//earthGroup.add(earthMesh);
 
 // add light
 const ambientLight = new THREE.AmbientLight(0xffffff, 2);
@@ -47,7 +53,7 @@ const glowSprite = new THREE.Sprite(glowMaterial);
 glowSprite.scale.set(2.5, 2.5, 1);
 
 glowMaterial.depthTest = false;
-glowSprite.renderOrder = 1; // render glow after earth
+glowSprite.renderOrder = 2; // render glow after earth
 
 earthGroup.add(glowSprite);
 
@@ -185,6 +191,106 @@ function _3Dto2D(startSphere, endSphere) {
     endPoint: endSphereXOY_Y,
   }
 }
+
+/**
+ * circleLine with width
+ * @param {*} cx 
+ * @param {*} cy 
+ * @param {*} radius 
+ * @param {*} startAngle 
+ * @param {*} endAngle 
+ * @param {*} color 
+ * @returns 
+ */
+function circleLine2(cx, cy, radius, startAngle, endAngle, color) {
+  const positions = [];
+  const segments = 100; // 圆弧分段数
+  for (let i = 0; i <= segments; i++) {
+    const angle = startAngle + (i / segments) * (endAngle - startAngle);
+    positions.push(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius, 0);
+  }
+
+  // 使用 LineGeometry
+  const geometry = new LineGeometry();
+  geometry.setPositions(positions); // 直接用一维数组
+
+  // 创建 LineMaterial
+  const material = new LineMaterial({
+    color: color,  // 设置颜色
+    linewidth: 2,  // 设置线宽（像素单位）
+    dashed: false, // 是否虚线
+  });
+
+  // 创建 Line2
+  const line = new Line2(geometry, material);
+  line.computeLineDistances(); // 如果需要虚线效果需要这步，普通线条可以省略
+  return line;
+}
+
+/**
+ * animate circle line with width
+ * @param {*} cx 
+ * @param {*} cy 
+ * @param {*} radius 
+ * @param {*} startAngle 
+ * @param {*} endAngle 
+ * @param {*} color 
+ * @param {*} duration unit: millisecond
+ * @param {*} cycle unit: millisecond
+ * @returns 
+ */
+function animateCircleLine2(cx, cy, radius, startAngle, endAngle, color, width, duration, cycle) {
+  const segments = 100; // 圆弧分段数
+  const step = (endAngle - startAngle) / segments; // 每步角度增量
+
+  // 创建几何体和材质
+  const geometry = new THREE.BufferGeometry();
+  const material = new THREE.LineBasicMaterial({ 
+    color: color, // 设置颜色
+    linewidth: 100, // 设置线宽（像素单位）
+  });
+
+  // 初始化空的 Line 对象
+  const positions = new Float32Array(segments * 3); // 每个点包含 [x, y, z]
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const line = new THREE.Line(geometry, material);
+
+  let index = 0;
+  for (let i = startAngle; i <= endAngle; i += step) {
+    positions[index++] = cx + Math.cos(i) * radius; // x
+    positions[index++] = cy + Math.sin(i) * radius; // y
+    positions[index++] = 0; // z
+  }
+
+  const clock = new THREE.Clock(); // Three.js 提供的计时器
+
+  function animate() {
+    const elapsedTime = clock.getElapsedTime(); // 获取流逝时间（秒）
+    console.log(elapsedTime / duration * 1000);
+    const progress = Math.min(elapsedTime / duration * 1000, 1); // 计算动画进度 [0, 1]
+
+    geometry.setDrawRange(0, index * progress / 3);
+
+    // 通知几何体顶点数据已更新
+    geometry.attributes.position.needsUpdate = true;
+
+    // 停止动画判断
+    if (progress < 1) {
+      requestAnimationFrame(animate);
+    }
+    else {
+      setTimeout(() => {
+        clock.start();
+        requestAnimationFrame(animate);
+      }, cycle);
+    }
+  }
+
+  animate();
+
+  return line;
+}
+
 /**通过函数arcXOY()可以在XOY平面上绘制一个关于y轴对称的圆弧曲线
  * startPoint, endPoint：表示圆弧曲线的起点和结束点坐标值，起点和结束点关于y轴对称
  * 同时在圆弧轨迹的基础上绘制一段飞线*/
@@ -210,7 +316,7 @@ function arcXOY(radius,startPoint, endPoint,options) {
   const endAngle = Math.PI - startAngle; //飞线圆弧结束角度
   console.log(startAngle, endAngle);
   // 调用圆弧线模型的绘制函数
-  const arcline = circleLine(flyArcCenter.x, flyArcCenter.y, flyArcR, startAngle, endAngle, options.color)
+  const arcline = animateCircleLine2(flyArcCenter.x, flyArcCenter.y, flyArcR, startAngle, endAngle, options.color, 5, 2000, 4000)
   // const arcline = new  Group();// 不绘制轨迹线，使用 Group替换circleLine()即可
   arcline.center = flyArcCenter; //飞线圆弧自定一个属性表示飞线圆弧的圆心
   arcline.topCoord = arcTopCoord; //飞线圆弧自定一个属性表示飞线圆弧中间也就是顶部坐标
